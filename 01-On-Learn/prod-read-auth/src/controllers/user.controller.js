@@ -151,6 +151,8 @@ const loginUser = TryCatch(async (req, res, next) => {
   const ipAddress = getClientIP(req);
   const userAgent = req.headers["user-agent"] || "Unknown";
 
+  await UserRefreshTokenModel.deleteMany({userId:user._id})
+
   const refreshTokenDoc = new UserRefreshTokenModel({
     token: refreshToken,
     userId: user._id,
@@ -160,26 +162,7 @@ const loginUser = TryCatch(async (req, res, next) => {
   });
   await refreshTokenDoc.save();
 
-  // Inactive the old Active Tokens
-  const activeTokenCount = await UserRefreshTokenModel.countDocuments({
-    userId: user._id,
-    isActive: true,
-  });
-
-  if (activeTokenCount > 1) {
-    const oldestTokens = await UserRefreshTokenModel.find({
-      userId: user._id,
-      isActive: true,
-    })
-      .sort({ createdAt: 1 })
-      .limit(activeTokenCount - 1);
-
-    const tokenIds = oldestTokens.map((token) => token._id);
-    await UserRefreshTokenModel.updateMany(
-      { _id: { $in: tokenIds } },
-      { isActive: false }
-    );
-  }
+  
 
   // Setting the Cookies
   setCookies(res, refreshToken, refreshTokenExp, accessToken, accessTokenExp);
@@ -198,7 +181,15 @@ const loginUser = TryCatch(async (req, res, next) => {
   });
 });
 
-const getProfile = TryCatch(async (req, res, next) => {});
+const getProfile = TryCatch(async (req, res, next) => {
+  const user = req.user
+  if(!user){
+    return next(new ErrorHandler(ErrorCodes.UNAUTHORIZED,'please login to continue'))
+  }
+  const existingUser = await UserModel.find({email:user.email}).select('-password')
+
+  return ApiResponse.success(res,existingUser)
+});
 
 const UserController = {
   createUser,

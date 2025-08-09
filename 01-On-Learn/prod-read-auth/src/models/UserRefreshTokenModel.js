@@ -14,7 +14,6 @@ const refreshTokenSchema = new mongoose.Schema(
     },
     ipAddress: { type: String, required: true },
     userAgent: { type: String, required: true },
-    isActive: { type: Boolean, default: true },
     expiresAt: { type: Date, required: true },
     createdAt: { type: Date, default: Date.now, index: true },
   },

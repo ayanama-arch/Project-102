@@ -1,19 +1,33 @@
+const jwt = require("jsonwebtoken");
+const { ErrorHandler, ErrorCodes } = require("../boiler-plate/error-handler");
 const TryCatch = require("../boiler-plate/try-catch");
-const getClientIP = require("../utils/client-ip");
-const checkValidRefreshToken = require("../utils/token-generation/checkValidToken");
-const isTokenExpired = require("../utils/token-generation/token-expiration");
 
-const accessTokenAutoRefresh = TryCatch(async (req, res, next) => {
-  let accessToken = req.cookies.accessToken;
+const accessTokenAutoRefresh = TryCatch((req, res, next) => {
+  const accessToken = req.cookies?.accessToken;
 
-  if (!accessToken || !isTokenExpired(accessToken)) {
-    const refreshToken = req.cookies.refreshToken;
-
-    if (!refreshToken)
-      return next(
-        new ErrorHandler(ErrorCodes.UNAUTHORIZED, "please login to continue")
-      );
-
-    checkValidRefreshToken(req, res, next);
+  if (!accessToken) {
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    return next(
+      new ErrorHandler(ErrorCodes.UNAUTHORIZED, "Please login to continue")
+    );
   }
+
+  // Check if Token is Expired
+  jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+    if (error) {
+      if (error.name === "TokenExpiredError") {
+        return next(new ErrorHandler(ErrorCodes.UNAUTHORIZED, "TokenExpired"));
+      }
+      return next(
+        new ErrorHandler(ErrorCodes.UNAUTHORIZED, "Token is not valid")
+      );
+    }
+    req.user = decoded;
+    // Set Authorization header so passport-jwt can authenticate
+    req.headers.authorization = `Bearer ${accessToken}`;
+    next();
+  });
 });
+
+module.exports = accessTokenAutoRefresh;
