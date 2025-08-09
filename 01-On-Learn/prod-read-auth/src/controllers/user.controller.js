@@ -1,4 +1,5 @@
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const TryCatch = require("../boiler-plate/try-catch");
 const { ErrorCodes, ErrorHandler } = require("../boiler-plate/error-handler");
 const ApiResponse = require("../boiler-plate/api-response");
@@ -12,6 +13,7 @@ const {
   generateRefreshToken,
 } = require("../utils/token-generation/generateToken");
 const setCookies = require("../utils/setCookies");
+const isTokenExpired = require("../utils/token-generation/token-expiration");
 
 const createUser = TryCatch(async (req, res, next) => {
   const { userName, email, password, firstName, lastName } = req.body;
@@ -151,7 +153,7 @@ const loginUser = TryCatch(async (req, res, next) => {
   const ipAddress = getClientIP(req);
   const userAgent = req.headers["user-agent"] || "Unknown";
 
-  await UserRefreshTokenModel.deleteMany({userId:user._id})
+  await UserRefreshTokenModel.deleteMany({ userId: user._id });
 
   const refreshTokenDoc = new UserRefreshTokenModel({
     token: refreshToken,
@@ -161,8 +163,6 @@ const loginUser = TryCatch(async (req, res, next) => {
     expiresAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
   });
   await refreshTokenDoc.save();
-
-  
 
   // Setting the Cookies
   setCookies(res, refreshToken, refreshTokenExp, accessToken, accessTokenExp);
@@ -182,13 +182,85 @@ const loginUser = TryCatch(async (req, res, next) => {
 });
 
 const getProfile = TryCatch(async (req, res, next) => {
-  const user = req.user
-  if(!user){
-    return next(new ErrorHandler(ErrorCodes.UNAUTHORIZED,'please login to continue'))
+  const user = req.user;
+  if (!user) {
+    return next(
+      new ErrorHandler(ErrorCodes.UNAUTHORIZED, "please login to continue")
+    );
   }
-  const existingUser = await UserModel.find({email:user.email}).select('-password')
+  const existingUser = await UserModel.find({ email: user.email }).select(
+    "-password"
+  );
 
-  return ApiResponse.success(res,existingUser)
+  return ApiResponse.success(res, existingUser);
+});
+
+const refreshToken = TryCatch(async (req, res, next) => {
+  const cookieRefreshToken = req.cookies?.refreshToken;
+
+  if (!cookieRefreshToken || isTokenExpired(cookieRefreshToken))
+    return next(
+      new ErrorHandler(ErrorCodes.UNAUTHORIZED, "please login to continue")
+    );
+
+  let decodeToken;
+  try {
+    decodeToken = jwt.verify(
+      cookieRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET
+    );
+  } catch (err) {
+    return next(
+      new ErrorHandler(ErrorCodes.UNAUTHORIZED, "please login to continue")
+    );
+  }
+
+  if (!decodeToken)
+    return next(
+      new ErrorHandler(ErrorCodes.UNAUTHORIZED, "please login to continue")
+    );
+
+  const existingRefreshToken = await UserRefreshTokenModel.findOne({
+    userId: decodeToken._id,
+  });
+
+  if (!existingRefreshToken)
+    return next(
+      new ErrorHandler(ErrorCodes.UNAUTHORIZED, "please login to continue")
+    );
+
+  const user = await UserModel.findById(decodeToken._id);
+  if (!user)
+    return next(
+      new ErrorHandler(ErrorCodes.UNAUTHORIZED, "please login to continue")
+    );
+
+  const { accessToken, accessTokenExp } = generateAccessToken(user);
+  const { refreshToken, refreshTokenExp } = generateRefreshToken(user);
+
+  setCookies(res, refreshToken, refreshTokenExp, accessToken, accessTokenExp);
+
+  return ApiResponse.success(res, "tokens updated successfully");
+});
+
+const logout = TryCatch(async (req, res, next) => {
+  const user = req.user;
+
+  await UserRefreshTokenModel.deleteOne({ userId: user._id });
+
+  // Clear cookies on client
+  res.clearCookie("accessToken", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "Strict",
+  });
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "Strict",
+  });
+
+  return ApiResponse.success(res, "user logout successfully");
 });
 
 const UserController = {
@@ -197,5 +269,7 @@ const UserController = {
   resendOtp,
   loginUser,
   getProfile,
+  refreshToken,
+  logout,
 };
 module.exports = UserController;

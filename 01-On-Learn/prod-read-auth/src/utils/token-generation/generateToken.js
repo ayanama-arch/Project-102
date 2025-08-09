@@ -7,7 +7,7 @@ const generateAccessToken = (user) => {
     role: user.role,
   };
 
-  const accessTokenExp = Math.floor(Date.now() / 1000) + 60 * 15;
+  const accessTokenExp = Math.floor(Date.now() / 1000) + 60 * 2;
   const accessToken = jwt.sign(
     { ...payload, exp: accessTokenExp },
     process.env.ACCESS_TOKEN_SECRET
