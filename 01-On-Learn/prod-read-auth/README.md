@@ -1,6 +1,17 @@
-Library
-
-**bcrypt**
-**mongoose**
-**express.json()**
-**validator**
+```json
+"dependencies": {
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cross-env": "^10.0.0",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.17.0",
+    "morgan": "^1.10.1",
+    "nodemailer": "^7.0.5",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "rotating-file-stream": "^3.2.6",
+    "validator": "^13.15.15"
+  }
+```

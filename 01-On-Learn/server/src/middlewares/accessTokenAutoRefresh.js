@@ -10,12 +10,9 @@ const TryCatch = require("../utils/try-catch");
 const accessTokenAutoRefresh = TryCatch(async (req, res, next) => {
   let accessToken = req.cookies.accessToken;
 
-  console.log("HERE: ", accessToken);
 
   if (!accessToken || isTokenExpired(accessToken)) {
     const refreshToken = req.cookies.refreshToken;
-    // console.log("HERE1", accessToken);
-    // console.log("HERE2", refreshToken);
 
     if (!refreshToken)
       return next(

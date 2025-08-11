@@ -7,6 +7,7 @@ function jwtVerifyMiddleware(req, res, next) {
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) return res.status(401).json({ message: 'Token invalid or expired' });
 
+
     req.user = decoded; // minimal user data from token payload
     next();
   });
